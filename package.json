@@ -36,8 +36,19 @@
         "preversion": "npm run build && npm test",
         "postversion": "git push && git push --tags"
     },
+	"pkg": {
+		"assets": [
+            "dist/lualib/**/*",
+            "node_modules/typescript/lib/**/*.d.ts"
+        ],
+        "targets": [
+            "node16-win-x64"
+        ],
+        "outputPath": "bin"
+    },
     "bin": {
-        "tstl": "dist/tstl.js"
+        "tstl": "dist/tstl.js",
+		"app": "dist/tstl.js"
     },
     "engines": {
         "node": ">=12.13.0"
