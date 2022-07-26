@@ -1,6 +1,6 @@
 {
     "name": "typescript-to-lua",
-    "version": "1.6.1",
+    "version": "1.6.3",
     "description": "A generic TypeScript to Lua transpiler. Write your code in TypeScript and publish Lua!",
     "repository": "https://github.com/TypeScriptToLua/TypeScriptToLua",
     "homepage": "https://typescripttolua.github.io/",
@@ -49,6 +49,12 @@
     "bin": {
         "tstl": "dist/tstl.js",
 		"app": "dist/tstl.js"
+    },
+    "pkg": {
+        "assets": [
+            "node_modules/typescript/lib/**/*.d.ts",
+            "dist/lualib/**/*.*"
+        ]
     },
     "engines": {
         "node": ">=12.13.0"
