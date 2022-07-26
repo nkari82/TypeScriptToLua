@@ -1,5 +1,5 @@
 import * as util from "../../util";
-import { invalidTableExtensionUse } from "../../../src/transformation/utils/diagnostics";
+import { invalidCallExtensionUse } from "../../../src/transformation/utils/diagnostics";
 
 describe("LuaTableGet & LuaTableSet extensions", () => {
     test("stand-alone function", () => {
@@ -78,7 +78,7 @@ describe("LuaTableGet & LuaTableSet extensions", () => {
             ${statement}
         `
             .withLanguageExtensions()
-            .expectDiagnosticsToMatchSnapshot([invalidTableExtensionUse.code]);
+            .expectDiagnosticsToMatchSnapshot([invalidCallExtensionUse.code]);
     });
 });
 
@@ -168,7 +168,7 @@ describe("LuaTableHas extension", () => {
             ${statement}
         `
             .withLanguageExtensions()
-            .expectDiagnosticsToMatchSnapshot([invalidTableExtensionUse.code]);
+            .expectDiagnosticsToMatchSnapshot([invalidCallExtensionUse.code]);
     });
 });
 
@@ -423,4 +423,23 @@ describe("LuaTable extension interface", () => {
             .withLanguageExtensions()
             .expectToEqual({ foo: 1, bar: 3, baz: 5 });
     });
+});
+
+test.each([
+    [undefined, undefined],
+    ["new LuaSet()", true],
+])("call on optional table with strictNullChecks (%s)", (value, expected) => {
+    util.testFunction`
+        function getFoo(): LuaSet<string> | undefined {
+            return ${value}
+        }
+        const foo = getFoo()
+        foo?.add("foo")
+        return foo?.has("foo")
+    `
+        .setOptions({
+            strictNullChecks: true,
+        })
+        .withLanguageExtensions()
+        .expectToEqual(expected);
 });
