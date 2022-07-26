@@ -50,12 +50,6 @@
         "tstl": "dist/tstl.js",
 		"app": "dist/tstl.js"
     },
-    "pkg": {
-        "assets": [
-            "node_modules/typescript/lib/**/*.d.ts",
-            "dist/lualib/**/*.*"
-        ]
-    },
     "engines": {
         "node": ">=12.13.0"
     },
