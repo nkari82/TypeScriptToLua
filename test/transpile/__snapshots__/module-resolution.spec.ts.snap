@@ -1,0 +1,17 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`supports complicated paths configuration 1`] = `
+Array [
+  "/paths-base-tsconfig/dist/packages/tstl-program/packages/mypackage/src/bar.lua",
+  "/paths-base-tsconfig/dist/packages/tstl-program/packages/mypackage/src/index.lua",
+  "/paths-base-tsconfig/dist/packages/tstl-program/packages/myprogram/src/main.lua",
+]
+`;
+
+exports[`supports paths configuration 1`] = `
+Array [
+  "/paths-simple/myprogram/dist/mypackage/bar.lua",
+  "/paths-simple/myprogram/dist/mypackage/index.lua",
+  "/paths-simple/myprogram/dist/myprogram/main.lua",
+]
+`;
