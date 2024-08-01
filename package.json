@@ -33,21 +33,21 @@
         "fix:prettier": "prettier --write .",
         "check:language-extensions": "tsc --strict language-extensions/index.d.ts",
         "preversion": "npm run build && npm test",
-        "postversion": "git push && git push --tags"
+        "postversion": "git push && git push --tags",
+        "build-pkg": "tsc && npm run build-lualib && pkg ."
     },
-	"pkg": {
-		"assets": [
+    "pkg": {
+        "assets": [
             "dist/lualib/**/*",
             "node_modules/typescript/lib/**/*.d.ts"
         ],
         "targets": [
             "node16-win-x64"
         ],
-        "outputPath": "bin"
+        "outputPath": "dist"
     },
     "bin": {
-        "tstl": "dist/tstl.js",
-		"app": "dist/tstl.js"
+        "app": "dist/tstl.js"
     },
     "engines": {
         "node": ">=16.10.0"
@@ -78,6 +78,7 @@
         "jest-circus": "^29.5.0",
         "lua-types": "^2.13.0",
         "lua-wasm-bindings": "^0.3.1",
+        "pkg": "^5.8.1",
         "prettier": "^2.8.4",
         "ts-jest": "^29.1.0",
         "ts-node": "^10.9.1",
