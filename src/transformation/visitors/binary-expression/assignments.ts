@@ -1,6 +1,6 @@
 import * as ts from "typescript";
+import { SyntaxKind } from "typescript";
 import * as lua from "../../../LuaAST";
-import { cast } from "../../../utils";
 import { TransformationContext } from "../../context";
 import { validateAssignment } from "../../utils/assignment-validation";
 import { createExportedIdentifier, getDependenciesOfSymbol, isSymbolExported } from "../../utils/export";
@@ -9,7 +9,7 @@ import { LuaLibFeature, transformLuaLibFunction } from "../../utils/lualib";
 import { isArrayType, isDestructuringAssignment } from "../../utils/typescript";
 import { isArrayLength, transformDestructuringAssignment } from "./destructuring-assignments";
 import { isMultiReturnCall } from "../language-extensions/multi";
-import { notAllowedOptionalAssignment } from "../../utils/diagnostics";
+import { cannotAssignToNodeOfKind, notAllowedOptionalAssignment } from "../../utils/diagnostics";
 import { transformElementAccessArgument } from "../access";
 import { moveToPrecedingTemp, transformExpressionList } from "../expression-list";
 import { transformInPrecedingStatementScope } from "../../utils/preceding-statements";
@@ -37,9 +37,16 @@ export function transformAssignmentLeftHandSideExpression(
     const symbol = context.checker.getSymbolAtLocation(node);
     const left = context.transformExpression(node);
 
-    return lua.isIdentifier(left) && symbol && isSymbolExported(context, symbol)
-        ? createExportedIdentifier(context, left)
-        : cast(left, lua.isAssignmentLeftHandSideExpression);
+    if (lua.isIdentifier(left) && symbol && isSymbolExported(context, symbol)) {
+        return createExportedIdentifier(context, left);
+    }
+
+    if (lua.isAssignmentLeftHandSideExpression(left)) {
+        return left;
+    } else {
+        context.diagnostics.push(cannotAssignToNodeOfKind(node, left.kind));
+        return lua.createAnonymousIdentifier();
+    }
 }
 
 export function transformAssignment(
@@ -67,6 +74,29 @@ export function transformAssignment(
         );
 
         return [arrayLengthAssignment];
+    }
+
+    if (ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) {
+        if (lhs.expression.kind === SyntaxKind.SuperKeyword) {
+            const symbol = context.checker.getSymbolAtLocation(lhs);
+            if (symbol && symbol.flags & ts.SymbolFlags.SetAccessor) {
+                return [
+                    lua.createExpressionStatement(
+                        transformLuaLibFunction(
+                            context,
+                            LuaLibFeature.DescriptorSet,
+                            parent,
+                            lua.createIdentifier("self"),
+                            context.transformExpression(lhs.expression),
+                            ts.isPropertyAccessExpression(lhs)
+                                ? lua.createStringLiteral(lhs.name.text)
+                                : context.transformExpression(lhs.argumentExpression),
+                            right
+                        )
+                    ),
+                ];
+            }
+        }
     }
 
     const symbol =
@@ -107,8 +137,9 @@ function transformDestructuredAssignmentExpression(
     context: TransformationContext,
     expression: ts.DestructuringAssignment
 ) {
-    let [rightPrecedingStatements, right] = transformInPrecedingStatementScope(context, () =>
-        context.transformExpression(expression.right)
+    let { precedingStatements: rightPrecedingStatements, result: right } = transformInPrecedingStatementScope(
+        context,
+        () => context.transformExpression(expression.right)
     );
     context.addPrecedingStatements(rightPrecedingStatements);
     if (isMultiReturnCall(context, expression.right)) {
@@ -153,7 +184,7 @@ export function transformAssignmentExpression(
     }
 
     if (ts.isPropertyAccessExpression(expression.left) || ts.isElementAccessExpression(expression.left)) {
-        const [precedingStatements, right] = transformInPrecedingStatementScope(context, () =>
+        const { precedingStatements, result: right } = transformInPrecedingStatementScope(context, () =>
             context.transformExpression(expression.right)
         );
 
@@ -233,7 +264,7 @@ export function transformAssignmentStatement(
         const { statements } = transformDestructuredAssignmentExpression(context, expression);
         return statements;
     } else {
-        const [precedingStatements, right] = transformInPrecedingStatementScope(context, () =>
+        const { precedingStatements, result: right } = transformInPrecedingStatementScope(context, () =>
             context.transformExpression(expression.right)
         );
         return transformAssignmentWithRightPrecedingStatements(context, expression.left, right, precedingStatements);

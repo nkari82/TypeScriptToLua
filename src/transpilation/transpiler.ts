@@ -45,7 +45,7 @@ export class Transpiler {
             }
         );
 
-        const { emitPlan } = this.getEmitPlan(program, transpileDiagnostics, freshFiles);
+        const { emitPlan } = this.getEmitPlan(program, transpileDiagnostics, freshFiles, plugins);
 
         const emitDiagnostics = this.emitFiles(program, plugins, emitPlan, writeFile);
 
@@ -90,6 +90,13 @@ export class Transpiler {
             }
         }
 
+        for (const plugin of plugins) {
+            if (plugin.afterEmit) {
+                const afterEmitPluginDiagnostics = plugin.afterEmit(program, options, this.emitHost, emitPlan) ?? [];
+                diagnostics.push(...afterEmitPluginDiagnostics);
+            }
+        }
+
         if (options.tstlVerbose) {
             console.log("Emit finished!");
         }
@@ -102,7 +109,8 @@ export class Transpiler {
     protected getEmitPlan(
         program: ts.Program,
         diagnostics: ts.Diagnostic[],
-        files: ProcessedFile[]
+        files: ProcessedFile[],
+        plugins: Plugin[]
     ): { emitPlan: EmitFile[] } {
         performance.startSection("getEmitPlan");
         const options = program.getCompilerOptions() as CompilerOptions;
@@ -112,7 +120,7 @@ export class Transpiler {
         }
 
         // Resolve imported modules and modify output Lua requires
-        const resolutionResult = resolveDependencies(program, files, this.emitHost);
+        const resolutionResult = resolveDependencies(program, files, this.emitHost, plugins);
         diagnostics.push(...resolutionResult.diagnostics);
 
         const lualibRequired = resolutionResult.resolvedFiles.some(f => f.fileName === "lualib_bundle");
@@ -195,7 +203,9 @@ export function getSourceDir(program: ts.Program): string {
     if (rootDir && rootDir.length > 0) {
         return path.isAbsolute(rootDir) ? rootDir : path.resolve(getProjectRoot(program), rootDir);
     }
-    return program.getCommonSourceDirectory();
+
+    // If no rootDir is given, source is relative to the project root
+    return getProjectRoot(program);
 }
 
 export function getEmitOutDir(program: ts.Program): string {

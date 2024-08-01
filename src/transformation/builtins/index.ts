@@ -11,13 +11,14 @@ import { transformConsoleCall } from "./console";
 import { transformFunctionPrototypeCall, transformFunctionProperty } from "./function";
 import { tryTransformBuiltinGlobalCall } from "./global";
 import { transformMathCall, transformMathProperty } from "./math";
-import { transformNumberConstructorCall, transformNumberPrototypeCall } from "./number";
+import { transformNumberConstructorCall, transformNumberPrototypeCall, transformNumberProperty } from "./number";
 import { transformObjectConstructorCall, tryTransformObjectPrototypeCall } from "./object";
 import { transformPromiseConstructorCall } from "./promise";
 import { transformStringConstructorCall, transformStringProperty, transformStringPrototypeCall } from "./string";
 import { transformSymbolConstructorCall } from "./symbol";
 import { unsupportedBuiltinOptionalCall } from "../utils/diagnostics";
 import { LuaTarget } from "../../CompilerOptions";
+import { transformMapConstructorCall } from "./map";
 
 export function transformBuiltinPropertyAccessExpression(
     context: TransformationContext,
@@ -27,6 +28,8 @@ export function transformBuiltinPropertyAccessExpression(
 
     if (ts.isIdentifier(node.expression) && isStandardLibraryType(context, ownerType, undefined)) {
         switch (ownerType.symbol.name) {
+            case "NumberConstructor":
+                return transformNumberProperty(context, node);
             case "Math":
                 return transformMathProperty(context, node);
             case "SymbolConstructor":
@@ -90,6 +93,9 @@ function tryTransformBuiltinGlobalMethodCall(
             break;
         case "Console":
             result = transformConsoleCall(context, node, calledMethod);
+            break;
+        case "MapConstructor":
+            result = transformMapConstructorCall(context, node, calledMethod);
             break;
         case "Math":
             result = transformMathCall(context, node, calledMethod);
@@ -162,7 +168,6 @@ export function transformBuiltinIdentifierExpression(
                 const huge = lua.createStringLiteral("huge");
                 return lua.createTableIndexExpression(math, huge, node);
             }
-
         case "globalThis":
             return lua.createIdentifier("_G", node, getIdentifierSymbolId(context, node, symbol), "globalThis");
     }

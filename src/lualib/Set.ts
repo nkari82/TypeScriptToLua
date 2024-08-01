@@ -1,4 +1,4 @@
-export class Set<T> {
+export class Set<T extends AnyNotNil> {
     public static [Symbol.species] = Set;
     public [Symbol.toStringTag] = "Set";
 
@@ -42,8 +42,8 @@ export class Set<T> {
             this.firstKey = value;
             this.lastKey = value;
         } else if (isNewValue) {
-            this.nextKey.set(this.lastKey, value);
-            this.previousKey.set(value, this.lastKey);
+            this.nextKey.set(this.lastKey!, value);
+            this.previousKey.set(value, this.lastKey!);
             this.lastKey = value;
         }
 
@@ -66,22 +66,22 @@ export class Set<T> {
             // Do order bookkeeping
             const next = this.nextKey.get(value);
             const previous = this.previousKey.get(value);
-            if (next && previous) {
+            if (next !== undefined && previous !== undefined) {
                 this.nextKey.set(previous, next);
                 this.previousKey.set(next, previous);
-            } else if (next) {
+            } else if (next !== undefined) {
                 this.firstKey = next;
-                this.previousKey.set(next, undefined);
-            } else if (previous) {
+                this.previousKey.set(next, undefined!);
+            } else if (previous !== undefined) {
                 this.lastKey = previous;
-                this.nextKey.set(previous, undefined);
+                this.nextKey.set(previous, undefined!);
             } else {
                 this.firstKey = undefined;
                 this.lastKey = undefined;
             }
 
-            this.nextKey.set(value, undefined);
-            this.previousKey.set(value, undefined);
+            this.nextKey.set(value, undefined!);
+            this.previousKey.set(value, undefined!);
         }
 
         return contains;
@@ -103,7 +103,7 @@ export class Set<T> {
 
     public entries(): IterableIterator<[T, T]> {
         const nextKey = this.nextKey;
-        let key: T = this.firstKey;
+        let key: T = this.firstKey!;
         return {
             [Symbol.iterator](): IterableIterator<[T, T]> {
                 return this;
@@ -118,7 +118,7 @@ export class Set<T> {
 
     public keys(): IterableIterator<T> {
         const nextKey = this.nextKey;
-        let key: T = this.firstKey;
+        let key: T = this.firstKey!;
         return {
             [Symbol.iterator](): IterableIterator<T> {
                 return this;
@@ -133,7 +133,7 @@ export class Set<T> {
 
     public values(): IterableIterator<T> {
         const nextKey = this.nextKey;
-        let key: T = this.firstKey;
+        let key: T = this.firstKey!;
         return {
             [Symbol.iterator](): IterableIterator<T> {
                 return this;
@@ -144,5 +144,91 @@ export class Set<T> {
                 return result;
             },
         };
+    }
+
+    /**
+     * @returns a new Set containing all the elements in this Set and also all the elements in the argument.
+     */
+    public union(other: ReadonlySet<T>): Set<T> {
+        const result = new Set<T>(this);
+        for (const item of other) {
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
+     * @returns a new Set containing all the elements which are both in this Set and in the argument.
+     */
+    public intersection(other: ReadonlySet<T>) {
+        const result = new Set<T>();
+        for (const item of this) {
+            if (other.has(item)) {
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @returns a new Set containing all the elements in this Set which are not also in the argument.
+     */
+    public difference(other: ReadonlySet<T>): Set<T> {
+        const result = new Set<T>(this);
+        for (const item of other) {
+            result.delete(item);
+        }
+        return result;
+    }
+
+    /**
+     * @returns a new Set containing all the elements which are in either this Set or in the argument, but not in both.
+     */
+    public symmetricDifference(other: ReadonlySet<T>): Set<T> {
+        const result = new Set<T>(this);
+        for (const item of other) {
+            if (this.has(item)) {
+                result.delete(item);
+            } else {
+                result.add(item);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @returns a boolean indicating whether all the elements in this Set are also in the argument.
+     */
+    public isSubsetOf(other: ReadonlySet<unknown>): boolean {
+        for (const item of this) {
+            if (!other.has(item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @returns a boolean indicating whether all the elements in the argument are also in this Set.
+     */
+    public isSupersetOf(other: ReadonlySet<unknown>): boolean {
+        for (const item of other) {
+            if (!this.has(item as T)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @returns a boolean indicating whether this Set has no elements in common with the argument.
+     */
+    public isDisjointFrom(other: ReadonlySetLike<unknown>): boolean {
+        for (const item of this) {
+            if (other.has(item)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

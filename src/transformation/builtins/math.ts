@@ -66,25 +66,42 @@ export function transformMathCall(
         case "log1p": {
             const log = lua.createStringLiteral("log");
             const one = lua.createNumericLiteral(1);
-            const add = lua.createBinaryExpression(one, params[0], lua.SyntaxKind.AdditionOperator);
+            const add = lua.createBinaryExpression(
+                one,
+                params[0] ?? lua.createNilLiteral(),
+                lua.SyntaxKind.AdditionOperator
+            );
             return lua.createCallExpression(lua.createTableIndexExpression(math, log), [add], node);
         }
 
         case "pow": {
             // Translate to base ^ power
-            return lua.createBinaryExpression(params[0], params[1], lua.SyntaxKind.PowerOperator, node);
+            return lua.createBinaryExpression(
+                params[0] ?? lua.createNilLiteral(),
+                params[1] ?? lua.createNilLiteral(),
+                lua.SyntaxKind.PowerOperator,
+                node
+            );
         }
 
         // math.floor(x + 0.5)
         case "round": {
             const floor = lua.createStringLiteral("floor");
             const half = lua.createNumericLiteral(0.5);
-            const add = lua.createBinaryExpression(params[0], half, lua.SyntaxKind.AdditionOperator);
+            const add = lua.createBinaryExpression(
+                params[0] ?? lua.createNilLiteral(),
+                half,
+                lua.SyntaxKind.AdditionOperator
+            );
             return lua.createCallExpression(lua.createTableIndexExpression(math, floor), [add], node);
         }
 
         case "sign": {
             return transformLuaLibFunction(context, LuaLibFeature.MathSign, node, ...params);
+        }
+
+        case "trunc": {
+            return transformLuaLibFunction(context, LuaLibFeature.MathTrunc, node, ...params);
         }
 
         case "abs":

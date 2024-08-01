@@ -22,6 +22,8 @@ import {
     isOptionalContinuation,
     captureThisValue,
 } from "./optional-chaining";
+import { SyntaxKind } from "typescript";
+import { getCustomNameFromSymbol } from "./identifier";
 
 function addOneToArrayAccessArgument(
     context: TransformationContext,
@@ -79,13 +81,15 @@ export function transformElementAccessExpressionWithCapture(
             context.diagnostics.push(invalidMultiReturnAccess(node));
         }
 
-        // When selecting the first element, we can shortcut
-        if (ts.isNumericLiteral(node.argumentExpression) && node.argumentExpression.text === "0") {
-            return { expression: table };
-        } else {
-            const selectIdentifier = lua.createIdentifier("select");
-            return { expression: lua.createCallExpression(selectIdentifier, [updatedAccessExpression, table]) };
+        const canOmitSelect = ts.isNumericLiteral(node.argumentExpression) && node.argumentExpression.text === "0";
+        if (canOmitSelect) {
+            // wrapping in parenthesis ensures only the first return value is used
+            // https://www.lua.org/manual/5.1/manual.html#2.5
+            return { expression: lua.createParenthesizedExpression(table) };
         }
+
+        const selectIdentifier = lua.createIdentifier("select");
+        return { expression: lua.createCallExpression(selectIdentifier, [updatedAccessExpression, table]) };
     }
 
     if (thisValueCapture) {
@@ -105,9 +109,15 @@ export function transformPropertyAccessExpressionWithCapture(
     node: ts.PropertyAccessExpression,
     thisValueCapture: lua.Identifier | undefined
 ): ExpressionWithThisValue {
-    const property = node.name.text;
     const type = context.checker.getTypeAtLocation(node.expression);
     const isOptionalLeft = isOptionalContinuation(node.expression);
+
+    let property = node.name.text;
+    const symbol = context.checker.getSymbolAtLocation(node.name);
+    const customName = getCustomNameFromSymbol(symbol);
+    if (customName) {
+        property = customName;
+    }
 
     const constEnumValue = tryGetConstEnumValue(context, node);
     if (constEnumValue) {
@@ -170,6 +180,21 @@ export function transformPropertyAccessExpressionWithCapture(
             expression,
             thisValue,
         };
+    }
+    if (node.expression.kind === SyntaxKind.SuperKeyword) {
+        const symbol = context.checker.getSymbolAtLocation(node);
+        if (symbol && symbol.flags & ts.SymbolFlags.GetAccessor) {
+            return {
+                expression: transformLuaLibFunction(
+                    context,
+                    LuaLibFeature.DescriptorGet,
+                    node,
+                    lua.createIdentifier("self"),
+                    table,
+                    lua.createStringLiteral(property)
+                ),
+            };
+        }
     }
     return { expression: lua.createTableIndexExpression(table, lua.createStringLiteral(property), node) };
 }

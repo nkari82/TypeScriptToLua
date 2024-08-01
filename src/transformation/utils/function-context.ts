@@ -30,14 +30,42 @@ function hasNoSelfAncestor(declaration: ts.Declaration): boolean {
 
 function getExplicitThisParameter(signatureDeclaration: ts.SignatureDeclaration): ts.ParameterDeclaration | undefined {
     const param = signatureDeclaration.parameters[0];
-    if (param && ts.isIdentifier(param.name) && param.name.originalKeywordKind === ts.SyntaxKind.ThisKeyword) {
+    if (param && ts.isIdentifier(param.name) && ts.identifierToKeywordKind(param.name) === ts.SyntaxKind.ThisKeyword) {
         return param;
     }
 }
 
+const callContextTypes = new WeakMap<ts.CallLikeExpression, ContextType>();
+
+export function getCallContextType(context: TransformationContext, callExpression: ts.CallLikeExpression): ContextType {
+    const known = callContextTypes.get(callExpression);
+    if (known !== undefined) return known;
+
+    const signature = context.checker.getResolvedSignature(callExpression);
+    const signatureDeclaration = signature?.getDeclaration();
+
+    let contextType = ContextType.None;
+
+    if (signatureDeclaration) {
+        contextType = computeDeclarationContextType(context, signatureDeclaration);
+    } else {
+        // No signature declaration could be resolved, so instead try to see if the declaration is in a
+        // noSelfInFile file
+        const declarations = findRootDeclarations(context, callExpression);
+        contextType = declarations.some(d => getFileAnnotations(d.getSourceFile()).has(AnnotationKind.NoSelfInFile))
+            ? ContextType.Void
+            : context.options.noImplicitSelf
+            ? ContextType.Void
+            : ContextType.NonVoid;
+    }
+
+    callContextTypes.set(callExpression, contextType);
+    return contextType;
+}
+
 const signatureDeclarationContextTypes = new WeakMap<ts.SignatureDeclaration, ContextType>();
 
-export function getDeclarationContextType(
+function getSignatureContextType(
     context: TransformationContext,
     signatureDeclaration: ts.SignatureDeclaration
 ): ContextType {
@@ -46,6 +74,34 @@ export function getDeclarationContextType(
     const contextType = computeDeclarationContextType(context, signatureDeclaration);
     signatureDeclarationContextTypes.set(signatureDeclaration, contextType);
     return contextType;
+}
+
+function findRootDeclarations(context: TransformationContext, callExpression: ts.CallLikeExpression): ts.Declaration[] {
+    const calledExpression = ts.isTaggedTemplateExpression(callExpression)
+        ? callExpression.tag
+        : ts.isJsxSelfClosingElement(callExpression)
+        ? callExpression.tagName
+        : ts.isJsxOpeningElement(callExpression)
+        ? callExpression.tagName
+        : ts.isCallExpression(callExpression)
+        ? callExpression.expression
+        : undefined;
+
+    if (!calledExpression) return [];
+
+    const calledSymbol = context.checker.getSymbolAtLocation(calledExpression);
+    if (calledSymbol === undefined) return [];
+
+    return (
+        calledSymbol.getDeclarations()?.flatMap(d => {
+            if (ts.isImportSpecifier(d)) {
+                const aliasSymbol = context.checker.getAliasedSymbol(calledSymbol);
+                return aliasSymbol.getDeclarations() ?? [];
+            } else {
+                return [d];
+            }
+        }) ?? []
+    );
 }
 
 function computeDeclarationContextType(context: TransformationContext, signatureDeclaration: ts.SignatureDeclaration) {
@@ -116,7 +172,15 @@ function reduceContextTypes(contexts: ContextType[]): ContextType {
 }
 
 function getSignatureDeclarations(context: TransformationContext, signature: ts.Signature): ts.SignatureDeclaration[] {
+    if (signature.compositeSignatures) {
+        return signature.compositeSignatures.flatMap(s => getSignatureDeclarations(context, s));
+    }
+
     const signatureDeclaration = signature.getDeclaration();
+    if (signatureDeclaration === undefined) {
+        return [];
+    }
+
     let inferredType: ts.Type | undefined;
     if (
         ts.isMethodDeclaration(signatureDeclaration) &&
@@ -164,6 +228,6 @@ function computeFunctionContextType(context: TransformationContext, type: ts.Typ
     }
 
     return reduceContextTypes(
-        signatures.flatMap(s => getSignatureDeclarations(context, s)).map(s => getDeclarationContextType(context, s))
+        signatures.flatMap(s => getSignatureDeclarations(context, s)).map(s => getSignatureContextType(context, s))
     );
 }

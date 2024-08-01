@@ -35,6 +35,10 @@ declare module "typescript" {
         parent?: Symbol;
     }
 
+    interface Signature {
+        compositeSignatures?: Signature[];
+    }
+
     function transformJsx(context: TransformationContext): (x: SourceFile) => SourceFile;
 
     export type OuterExpression =
@@ -46,4 +50,15 @@ declare module "typescript" {
 
     function skipOuterExpressions(node: Expression, kinds?: OuterExpressionKinds): Expression;
     export function isOuterExpression(node: Node, kinds?: OuterExpressionKinds): node is OuterExpression;
+
+    export function nodeNextJsonConfigResolver(
+        moduleName: string,
+        containingFile: string,
+        host: ModuleResolutionHost
+    ): ResolvedModuleWithFailedLookupLocations;
+
+    export function pathIsAbsolute(path: string): boolean;
+    export function pathIsRelative(path: string): boolean;
+
+    export function setParent<T extends Node>(child: T, parent: T["parent"] | undefined): T;
 }

@@ -88,20 +88,24 @@ export function transformArrayPrototypeCall(
 
     const expressionName = calledMethod.name.text;
     switch (expressionName) {
+        case "at":
+            return transformLuaLibFunction(context, LuaLibFeature.ArrayAt, node, caller, ...params);
         case "concat":
             return transformLuaLibFunction(context, LuaLibFeature.ArrayConcat, node, caller, ...params);
         case "entries":
             return transformLuaLibFunction(context, LuaLibFeature.ArrayEntries, node, caller);
+        case "fill":
+            return transformLuaLibFunction(context, LuaLibFeature.ArrayFill, node, caller, ...params);
         case "push":
             if (node.arguments.length === 1) {
-                const param = params[0];
+                const param = params[0] ?? lua.createNilLiteral();
                 if (isUnpackCall(param)) {
                     return transformLuaLibFunction(
                         context,
                         LuaLibFeature.ArrayPushArray,
                         node,
                         caller,
-                        (param as lua.CallExpression).params[0]
+                        (param as lua.CallExpression).params[0] ?? lua.createNilLiteral()
                     );
                 }
                 if (!lua.isDotsLiteral(param)) {
@@ -162,7 +166,7 @@ export function transformArrayPrototypeCall(
                 typeAlwaysHasSomeOfFlags(context, elementType, ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike)
             ) {
                 const defaultSeparatorLiteral = lua.createStringLiteral(",");
-                const param = params[0];
+                const param = params[0] ?? lua.createNilLiteral();
                 const parameters = [
                     caller,
                     node.arguments.length === 0
@@ -184,6 +188,14 @@ export function transformArrayPrototypeCall(
             return transformLuaLibFunction(context, LuaLibFeature.ArrayFlat, node, caller, ...params);
         case "flatMap":
             return transformLuaLibFunction(context, LuaLibFeature.ArrayFlatMap, node, caller, ...params);
+        case "toReversed":
+            return transformLuaLibFunction(context, LuaLibFeature.ArrayToReversed, node, caller, ...params);
+        case "toSorted":
+            return transformLuaLibFunction(context, LuaLibFeature.ArrayToSorted, node, caller, ...params);
+        case "toSpliced":
+            return transformLuaLibFunction(context, LuaLibFeature.ArrayToSpliced, node, caller, ...params);
+        case "with":
+            return transformLuaLibFunction(context, LuaLibFeature.ArrayWith, node, caller, ...params);
         default:
             context.diagnostics.push(unsupportedProperty(calledMethod.name, "array", expressionName));
     }
